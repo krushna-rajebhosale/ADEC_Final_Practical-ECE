@@ -1,0 +1,360 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>2D Digital Trainer Kit</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#eef1f5;--fg:#1c2330;--card:#fff;--bd:#c5ccd8;--ac:#2563eb;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141820;--fg:#e8ecf3;--card:#1f2530;--bd:#3a4354;--ac:#6ea0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141820;--fg:#e8ecf3;--card:#1f2530;--bd:#3a4354;--ac:#6ea0ff;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px system-ui,sans-serif}
+h1{font-size:19px;margin:0;padding:12px 12px 4px}
+.row{display:flex;flex-wrap:wrap;gap:8px;padding:6px 12px;align-items:center}
+button,input{font:inherit;padding:7px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--fg)}
+button{cursor:pointer}button:active{background:var(--bd)}
+input[type=number]{width:70px}
+.shelf{display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--card);border:1px solid var(--bd);border-radius:10px;margin:4px 12px;max-height:150px;overflow:auto}
+.chip{touch-action:none;user-select:none;cursor:grab;background:#2b2e36;color:#fff;border-radius:4px;padding:5px 9px;font:600 12px monospace;border:1px solid #000}
+.chip small{display:block;font:400 9px system-ui;opacity:.75;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-50%);opacity:.9}
+#msg{margin:6px 12px;padding:10px 12px;background:var(--card);border-left:5px solid var(--ac);border-radius:6px}
+#stage{overflow-x:auto;padding:8px}
+#b{display:block;margin:0 auto;width:100%;min-width:820px;max-width:1200px;border-radius:10px}
+#b [data-ic],#b [data-sw],#b [data-pb]{touch-action:none}
+.warn{color:#d33;margin:4px 12px}
+footer{text-align:center;padding:14px;font-size:12px;opacity:.7}
+.alert{position:sticky;top:0;z-index:20;background:#c62828;color:#fff;padding:10px 12px;margin:6px 12px;border-radius:8px}
+.alert button{padding:2px 10px;margin-left:8px}
+.pr{margin:6px 12px;padding:8px 12px;background:var(--card);border:1px solid var(--bd);border-radius:8px}
+.pr table,.res table{border-collapse:collapse;font-size:13px}.pr td,.pr th{border:1px solid var(--bd);padding:2px 8px}.pr ol{margin:6px 0 6px 18px;padding:0}
+.res{margin:6px 12px;padding:8px 12px;background:var(--card);border:1px solid var(--bd);border-radius:8px}.res td{padding:2px 12px 2px 0}
+.ok{color:#1a8a3a}.bad{color:#d33}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;padding:6px 12px}
+.grid label{display:flex;justify-content:space-between;align-items:center;gap:6px}.grid input,.grid select{width:100px}
+canvas{max-width:calc(100% - 24px);display:block;margin:8px auto;background:var(--card);border:1px solid var(--bd);border-radius:8px}
+[hidden]{display:none!important}
+</style></head><body>
+<h1>🔌 Digital &amp; Analog Trainer Lab</h1><div class="row"><button id="tabD" class="p">Digital Trainer (practicals 1–4)</button><button id="tabA">Analog Lab (practicals 5–9)</button></div><div id="dig">
+<div class="row"><button id="undo">↶ Undo</button><button id="clr">🗑 Clear all</button>
+<label><input type="checkbox" id="auto"> Auto power (skip power wiring – quick tests only)</label></div>
+<div class="row"><b>Practical:</b><select id="prsel"></select><button id="prbuild">Build it for me</button><button id="prchk" class="p">Check my circuit</button><button id="prtim">Timing diagram</button></div><div id="prinfo" class="pr" hidden></div><div class="row" hidden><b>Examples:</b><button id="ex1">Half adder</button><button id="ex2">Counter + display</button><button id="ex3">4-bit adder</button></div>
+<div class="row"><b>Chip:</b><select id="icsel"></select><span class="chip" id="tok" title="Drag me into a socket">drag me</span><button id="addic">Add to board</button></div>
+<div id="msg">👋 Step 1: <b>drag a chip</b> from the shelf into a socket (or tap a chip). Step 2: tap one pin, then another pin, to join them with a wire. Step 3: flip the switches and watch the lights.</div>
+<div class="row">Clock <input id="hz" type="number" min="0.1" max="50" step="0.1" value="1"> Hz
+<button id="cs">▶ Start</button><button id="cp">⏸ Pause</button><button id="c1">Single pulse</button><span id="cst"></span></div>
+<div id="alert" class="alert" hidden></div><div id="warn"></div>
+<div id="stage"><svg id="b" viewBox="0 0 980 590"></svg></div><canvas id="tcv" width="900" height="200" hidden></canvas><div id="prres" class="pr" hidden></div></div><div id="ana" hidden><div class="row"><b>Analog practical:</b><select id="asel"></select></div><div id="apane"></div></div>
+<footer>Tap a wire to remove it. Drag a chip off the board to remove it. Tap the small CA/CC/BCD label on a display to change its type. Unconnected inputs count as HIGH (1), like real TTL. Pinouts are written from memory – please check them against your datasheet.</footer><div style="text-align:center;padding:10px 8px 28px"><div style="font-size:11px;opacity:.7">Created by:</div><div style="font-size:28px;font-weight:700;letter-spacing:.5px">Krushna Rajebhosale</div><div style="font-size:11px;opacity:.7;margin-top:4px">© All copyrights reserved by Krushna Rajebhosale</div></div>
+<script>
+const $=id=>document.getElementById(id);
+const FN={nand:(a,b)=>+!(a&b),nor:(a,b)=>+!(a|b),not:a=>+!a,and:(a,b)=>a&b,or:(a,b)=>a|b,xor:(a,b)=>a^b,xnor:(a,b)=>+!(a^b)};
+const Q4=[[1,2,3],[4,5,6],[9,10,8],[12,13,11]],NR=[[2,3,1],[5,6,4],[8,9,10],[11,12,13]],H6=[[1,2],[3,4],[5,6],[9,8],[11,10],[13,12]];
+const D={};
+function gate(t,desc,f,g){const nm=Array(14).fill('');nm[6]='GND';nm[13]='VCC';g.forEach((a,k)=>{a.slice(0,-1).forEach((p,j)=>nm[p-1]=(k+1)+(a.length>2?'AB'[j]:'A'));nm[a[a.length-1]-1]=(k+1)+'Y'});
+D[t]={desc,n:14,vcc:14,gnd:7,nm,out:g.map(a=>a[a.length-1]),ev:(ic,I)=>{const o={};g.forEach(a=>{o[a[a.length-1]]=FN[f](...a.slice(0,-1).map(I))});return o}}}
+gate('74LS00','Quad 2-input NAND','nand',Q4);gate('74LS02','Quad 2-input NOR','nor',NR);gate('74LS04','Hex inverter','not',H6);
+gate('74LS08','Quad 2-input AND','and',Q4);gate('74LS32','Quad 2-input OR','or',Q4);gate('74LS86','Quad 2-input XOR','xor',Q4);gate('74LS266','Quad XNOR','xnor',Q4);
+const def=(t,desc,nm,outs,f)=>{const a=nm.split(' '),pin={};a.forEach((x,i)=>pin[x]=i+1);
+D[t]={desc,n:a.length,vcc:pin.VCC,gnd:pin.GND,nm:a.map(x=>x==='-'?'NC':x),out:outs.split(' ').map(x=>pin[x]),ev:(ic,I)=>{const o=f(x=>I(pin[x]),ic),r={};for(const k in o)r[pin[k]]=o[k];return r}}};
+let noEdge=false;const E=(ic,k,x,r)=>{const p=ic.s[k];ic.s[k]=x;return noEdge?false:r?p===0&&x===1:p===1&&x===0};
+const nd=x=>+!x.every(v=>v),bt=(n,k)=>n>>k&1;
+def('74LS74','Dual D flip-flop (rising edge)','1CLR 1D 1CLK 1PRE 1Q /1Q GND /2Q 2Q 2PRE 2CLK 2D 2CLR VCC','1Q /1Q 2Q /2Q',(I,ic)=>{const o={};
+[1,2].forEach(i=>{const K=I(i+'CLK'),pv=ic.s['k'+i]??K;ic.s['k'+i]=K;let Q=ic.s['q'+i]??0;const C=I(i+'CLR'),P=I(i+'PRE');
+if(!C&&!P){o[i+'Q']=1;o['/'+i+'Q']=1;return}if(!C)Q=0;else if(!P)Q=1;else if(!pv&&K)Q=I(i+'D');ic.s['q'+i]=Q;o[i+'Q']=Q;o['/'+i+'Q']=1-Q});return o});
+def('74LS138','3-to-8 decoder (outputs LOW)','A B C /G2A /G2B G1 /Y7 GND /Y6 /Y5 /Y4 /Y3 /Y2 /Y1 /Y0 VCC','/Y0 /Y1 /Y2 /Y3 /Y4 /Y5 /Y6 /Y7',I=>{const en=I('G1')&&!I('/G2A')&&!I('/G2B'),ix=I('A')+2*I('B')+4*I('C'),o={};for(let k=0;k<8;k++)o['/Y'+k]=+!(en&&k===ix);return o});
+def('74LS20','Dual 4-input NAND','1A 1B - 1C 1D 1Y GND 2Y 2A 2B - 2C 2D VCC','1Y 2Y',I=>({'1Y':nd(['1A','1B','1C','1D'].map(I)),'2Y':nd(['2A','2B','2C','2D'].map(I))}));
+def('74LS30','8-input NAND','A B C D E F GND Y - - G H - VCC','Y',I=>({Y:nd('ABCDEFGH'.split('').map(I))}));
+const dc=(I,g,a,b,y)=>{const G=I(g),i=I(a)+2*I(b),r={};y.forEach((n,k)=>r[n]=+!(!G&&i===k));return r};
+def('74LS139','Dual 2-to-4 decoder','/1G 1A 1B /1Y0 /1Y1 /1Y2 /1Y3 GND /2Y3 /2Y2 /2Y1 /2Y0 2B 2A /2G VCC','/1Y0 /1Y1 /1Y2 /1Y3 /2Y0 /2Y1 /2Y2 /2Y3',I=>({...dc(I,'/1G','1A','1B',['/1Y0','/1Y1','/1Y2','/1Y3']),...dc(I,'/2G','2A','2B',['/2Y0','/2Y1','/2Y2','/2Y3'])}));
+def('74LS155','Dual 2-to-4 decoder/demux','1C /1G B /1Y3 /1Y2 /1Y1 /1Y0 GND /2Y0 /2Y1 /2Y2 /2Y3 A /2G /2C VCC','/1Y0 /1Y1 /1Y2 /1Y3 /2Y0 /2Y1 /2Y2 /2Y3',I=>{const i=I('A')+2*I('B'),r={};
+[0,1,2,3].forEach(k=>{r['/1Y'+k]=+!(I('1C')&&!I('/1G')&&i===k);r['/2Y'+k]=+!(!I('/2C')&&!I('/2G')&&i===k)});return r});
+def('74LS148','8-to-3 priority encoder','/4 /5 /6 /7 /EI /A2 /A1 GND /A0 /0 /1 /2 /3 /GS /EO VCC','/A2 /A1 /A0 /GS /EO',I=>{const x=[0,1,2,3,4,5,6,7].map(k=>I('/'+k));
+if(I('/EI'))return{'/A2':1,'/A1':1,'/A0':1,'/GS':1,'/EO':1};let k=-1;x.forEach((v,j)=>{if(!v)k=j});if(k<0)return{'/A2':1,'/A1':1,'/A0':1,'/GS':1,'/EO':0};const o=7-k;return{'/A2':bt(o,2),'/A1':bt(o,1),'/A0':bt(o,0),'/GS':0,'/EO':1}});
+def('74LS147','Decimal-to-BCD priority encoder','/4 /5 /6 /7 /8 /C /B GND /A /1 /2 /3 /9 /D - VCC','/D /C /B /A',I=>{let k=0;[1,2,3,4,5,6,7,8,9].forEach(j=>{if(!I('/'+j))k=j});const o=15-k;return{'/D':bt(o,3),'/C':bt(o,2),'/B':bt(o,1),'/A':bt(o,0)}});
+def('74LS151','8-to-1 multiplexer','D3 D2 D1 D0 Y W /E GND C B A D7 D6 D5 D4 VCC','Y W',I=>{if(I('/E'))return{Y:0,W:1};const y=I('D'+(I('A')+2*I('B')+4*I('C')));return{Y:y,W:1-y}});
+def('74LS153','Dual 4-to-1 multiplexer','/1G B 1C3 1C2 1C1 1C0 1Y GND 2Y 2C0 2C1 2C2 2C3 A /2G VCC','1Y 2Y',I=>{const s=I('A')+2*I('B'),r={};[1,2].forEach(g=>{r[g+'Y']=I('/'+g+'G')?0:I(g+'C'+s)});return r});
+def('74LS157','Quad 2-to-1 multiplexer','S 1A 1B 1Y 2A 2B 2Y GND 3Y 3B 3A 4Y 4B 4A /G VCC','1Y 2Y 3Y 4Y',I=>{const r={};for(let k=1;k<5;k++)r[k+'Y']=I('/G')?0:I(k+(I('S')?'B':'A'));return r});
+const c90=(t,desc,nm,mod,seq,r9)=>def(t,desc,nm,'QA QB QC QD',(I,ic)=>{let a=ic.s.a??0,b=ic.s.b??0;const ea=E(ic,'ka',I('CKA'),0),eb=E(ic,'kb',I('CKB'),0);
+const rs=(r9&&I('R91')&&I('R92'))||(I('R01')&&I('R02')),was=ic.s.rs;ic.s.rs=rs;if(r9&&I('R91')&&I('R92')){a=1;b=mod-1}else if(I('R01')&&I('R02')){a=0;b=0}else if(!was){if(ea)a=1-a;if(eb)b=(b+1)%mod}
+ic.s.a=a;ic.s.b=b;const v=seq[b];return{QA:a,QB:bt(v,0),QC:bt(v,1),QD:bt(v,2)}});
+c90('74LS90','Decade counter','CKB R01 R02 - VCC R91 R92 QC QB GND QD QA - CKA',5,[0,1,2,3,4],1);
+c90('74LS92','Divide-by-12 counter','CKB - - - VCC R01 R02 QD QC GND QB QA - CKA',6,[0,1,2,4,5,6],0);
+c90('74LS93','4-bit binary counter','CKB R01 R02 - VCC - - QC QB GND QD QA - CKA',8,[0,1,2,3,4,5,6,7],0);
+const cn=(t,desc,mod,sy)=>def(t,desc,'/CLR CLK A B C D ENP GND /LOAD ENT QD QC QB QA RCO VCC','QD QC QB QA RCO',(I,ic)=>{let q=ic.s.q??0;const ck=E(ic,'k',I('CLK'),1),cl=I('/CLR');
+if(!sy&&!cl)q=0;else if(ck){if(sy&&!cl)q=0;else if(!I('/LOAD'))q=I('A')|I('B')<<1|I('C')<<2|I('D')<<3;else if(I('ENP')&&I('ENT'))q=(q+1)%mod}
+ic.s.q=q;return{QA:bt(q,0),QB:bt(q,1),QC:bt(q,2),QD:bt(q,3),RCO:+(I('ENT')&&q===mod-1)}});
+cn('74LS160','Sync decade counter, async clear',10,0);cn('74LS161','Sync 4-bit counter, async clear',16,0);cn('74LS163','Sync 4-bit counter, sync clear',16,1);
+const jk=(t,desc,nm)=>{const has=x=>nm.split(' ').includes(x);def(t,desc,nm,'1Q /1Q 2Q /2Q',(I,ic)=>{const r={};[1,2].forEach(i=>{const J=I(i+'J'),K=I(i+'K'),e=E(ic,'k'+i,I(i+'CLK'),0),P=has('/'+i+'PRE')?I('/'+i+'PRE'):1,C=has('/'+i+'CLR')?I('/'+i+'CLR'):1;let Q=ic.s['q'+i]??0;
+if(!C&&!P){ic.s['q'+i]=0;r[i+'Q']=1;r['/'+i+'Q']=1;return}if(!C)Q=0;else if(!P)Q=1;else if(e)Q=J&&K?1-Q:J?1:K?0:Q;ic.s['q'+i]=Q;r[i+'Q']=Q;r['/'+i+'Q']=1-Q});return r})};
+jk('74LS76','Dual JK flip-flop, PRE/CLR','1CLK /1PRE /1CLR 1J VCC 2CLK /2PRE /2CLR 2J /2Q 2Q 2K GND /1Q 1Q 1K');
+jk('74LS73','Dual JK flip-flop, clear','1CLK /1CLR 1K VCC 2CLK /2CLR 2J /2Q 2Q 2K GND 1Q /1Q 1J');
+jk('74LS112','Dual JK flip-flop, falling edge','1CLK 1K 1J /1PRE 1Q /1Q /2Q GND 2Q /2PRE 2J 2K 2CLK /2CLR /1CLR VCC');
+const ad=(t,desc,nm)=>def(t,desc,nm,'S1 S2 S3 S4 C4',I=>{const s=(I('A1')|I('A2')<<1|I('A3')<<2|I('A4')<<3)+(I('B1')|I('B2')<<1|I('B3')<<2|I('B4')<<3)+I('C0');return{S1:bt(s,0),S2:bt(s,1),S3:bt(s,2),S4:bt(s,3),C4:bt(s,4)}});
+ad('74LS283','4-bit full adder','S2 B2 A2 S1 A1 B1 C0 GND C4 S4 B4 A4 S3 B3 A3 VCC');ad('74LS83','4-bit full adder (other pinout)','A4 S3 A3 B3 VCC S2 B2 A2 S1 B1 A1 GND C0 C4 S4 B4');
+def('74LS85','4-bit magnitude comparator','B3 LTi EQi GTi GTo EQo LTo GND B0 A0 B1 A1 A2 B2 A3 VCC','GTo EQo LTo',I=>{const a=I('A0')|I('A1')<<1|I('A2')<<2|I('A3')<<3,b=I('B0')|I('B1')<<1|I('B2')<<2|I('B3')<<3;
+if(a>b)return{GTo:1,EQo:0,LTo:0};if(a<b)return{GTo:0,EQo:0,LTo:1};return I('EQi')?{GTo:0,EQo:1,LTo:0}:{GTo:+!I('LTi'),EQo:0,LTo:+!I('GTi')}});
+const SG=['1111110','0110000','1101101','1111001','0110011','1011011','0011111','1110000','1111111','1110011'];
+const sd=(t,desc,oc)=>def(t,desc,'B C /LT /BI /RBI D A GND e d c b a g f VCC','a b c d e f g',I=>{const n=I('A')|I('B')<<1|I('C')<<2|I('D')<<3,r={};
+'abcdefg'.split('').forEach((s,i)=>{let on;if(!I('/BI'))on=0;else if(!I('/LT'))on=1;else if(n===0&&!I('/RBI'))on=0;else if(n>9)on=0;else on=+SG[n][i];r[s]=oc?(on?0:'Z'):on});return r});
+sd('74LS47','BCD to 7-seg, active-LOW (use CA display)',1);sd('74LS48','BCD to 7-seg, active-HIGH (use CC display)',0);
+const O8='1Q 2Q 3Q 4Q 5Q 6Q 7Q 8Q';
+def('74LS373','Octal transparent latch, 3-state','/OC 1Q 1D 2D 2Q 3Q 3D 4D 4Q GND LE 5Q 5D 6D 6Q 7Q 7D 8D 8Q VCC',O8,(I,ic)=>{const r={};for(let k=1;k<9;k++){let q=ic.s['q'+k]??0;if(I('LE'))q=I(k+'D');ic.s['q'+k]=q;r[k+'Q']=I('/OC')?'Z':q}return r});
+def('74LS273','Octal D flip-flop, /MR','/MR 1Q 1D 2D 2Q 3Q 3D 4D 4Q GND CLK 5Q 5D 6D 6Q 7Q 7D 8D 8Q VCC',O8,(I,ic)=>{const e=E(ic,'k',I('CLK'),1),r={};for(let k=1;k<9;k++){let q=ic.s['q'+k]??0;if(!I('/MR'))q=0;else if(e)q=I(k+'D');ic.s['q'+k]=q;r[k+'Q']=q}return r});
+def('74LS245','Octal bus transceiver, 3-state','DIR A1 A2 A3 A4 A5 A6 A7 A8 GND B8 B7 B6 B5 B4 B3 B2 B1 /G VCC','A1 A2 A3 A4 A5 A6 A7 A8 B1 B2 B3 B4 B5 B6 B7 B8',I=>{const r={};for(let k=1;k<9;k++){r['A'+k]='Z';r['B'+k]='Z'}
+if(I('/G'))return r;const d=I('DIR'),s=d?'A':'B',t=d?'B':'A';for(let k=1;k<9;k++)r[t+k]=I(s+k);return r});
+
+let c={ics:[],wires:[],sw:Array(16).fill(0),clk:0,pul:0,auto:false,dt:[0,0]},cnt=0,pend=null,hist=[],tm=null,ck=0,drag=null,ghost=null;
+const SX=u=>30+u*190,SEG=[[6,0,28,5],[34,4,5,22],[34,30,5,22],[6,52,28,5],[1,30,5,22],[1,4,5,22],[6,26,28,5]],RY=17;
+function pc(id){let m;
+if(m=id.match(/^S(\d+)$/))return[36+m[1]*34,450];if(m=id.match(/^L(\d+)$/))return[36+m[1]*34,100];
+if(m=id.match(/^D(\d)\.(\w)$/)){const i=m[2]==='C'?7:+m[2];return[640+m[1]*160+(c.dt[m[1]]?i:i+2)*14,100]}
+if(m=id.match(/^(VCC|GND)(\d)$/))return[SX(+m[2])+22,m[1]==='VCC'?186:376];if(id==='CLK')return[640,450];if(id==='PUL')return[740,450];if(id==='VCC')return[850,450];if(id==='GND')return[920,450];
+m=id.match(/^(I\d+)\.(\d+)$/);const ic=c.ics.find(i=>i.id===m[1]),n=D[ic.t].n,p=+m[2],x=SX(ic.u);
+return p<=n/2?[x+20,205+(p-1)*RY]:[x+130,205+(n-p)*RY]}
+function nets(){const P={},f=a=>{a=a.replace(/^(VCC|GND)\d$/,'$1');P[a]=P[a]??a;while(P[a]!==a){P[a]=P[P[a]];a=P[a]}return a};
+c.wires.forEach(w=>{const r=f(w[1]);P[f(w[0])]=r});const S={},add=(id,v)=>{const r=f(id);(S[r]=S[r]||new Set()).add(v)};
+add('VCC',1);add('GND',0);c.sw.forEach((v,i)=>add('S'+i,v));add('CLK',c.clk);add('PUL',c.pul);
+c.ics.forEach(ic=>{for(const p in ic.out)add(ic.id+'.'+p,ic.out[p])});
+const v=id=>{const s=S[f(id)];return !s?undefined:s.size>1?'X':[...s][0]};v.bad=Object.keys(S).filter(k=>S[k].size>1);return v}
+function settle(){if(c.ics.some(i=>!i.pri)){noEdge=true;sloop();noEdge=false;c.ics.forEach(i=>i.pri=1)}return sloop()}
+function sloop(){let n;for(let it=0;it<25;it++){n=nets();let ch=false;
+c.ics.forEach(ic=>{const d=D[ic.t];ic.pw=c.auto||(n(ic.id+'.'+d.vcc)===1&&n(ic.id+'.'+d.gnd)===0);
+const I=p=>n(ic.id+'.'+p)===0?0:1,o=ic.pw?d.ev(ic,I):{};for(const k in o)if(o[k]==='Z')delete o[k];
+for(const k in ic.out)if(!(k in o)){delete ic.out[k];ch=true}for(const k in o)if(ic.out[k]!==o[k]){ic.out[k]=o[k];ch=true}});if(!ch)break}return nets()}
+const snap=()=>JSON.stringify({ics:c.ics.map(({id,t,u})=>({id,t,u})),wires:c.wires,sw:c.sw,dt:c.dt});
+function restore(s){const o=JSON.parse(s);c.ics=o.ics.map(i=>({...i,out:{},s:{}}));c.wires=o.wires;c.sw=o.sw;c.dt=o.dt;cnt=Math.max(0,...c.ics.map(i=>+i.id.slice(1)));render()}
+const push=()=>{hist.push(snap());if(hist.length>50)hist.shift()};
+const msg=t=>$('msg').innerHTML=t,wcol=['#e53935','#f9a825','#2e9d4f','#8e44ad','#ef6c00','#00897b','#d81b60','#6d4c41'];
+const kind=id=>/^(VCC|GND)\d$/.test(id)?'I':/^[LD]/.test(id)?'T':/^(S|CLK|PUL|VCC|GND)/.test(id)?'B':'I';
+function route(w,i){const[a,b]=w,ka=kind(a),kb=kind(b),yT=114+(i*4)%44,yB=394+(i*4)%36,off=((i%7)-3)*4;
+const ch=ka==='T'||kb==='T'?'T':ka==='B'||kb==='B'?'B':(i%2?'T':'B'),ca=ka==='I'?ch:ka,cb=kb==='I'?ch:kb;
+const ep=(id,k,cc)=>{const P=pc(id),y=cc==='T'?yT:yB;if(k!=='I')return[P,[P[0],y]];let u,left;const m=id.match(/^(I\d+)\.(\d+)/);if(m){const ic=c.ics.find(q=>q.id===m[1]);u=ic.u;left=+m[2]<=D[ic.t].n/2}else{u=+id.slice(3);left=true}const lx=(left?SX(u)-15:SX(u)+165)+off;return[P,[lx,P[1]],[lx,y]]};
+let p=[...ep(a,ka,ca),...(ca===cb?[]:[[SX(2)-15+off,ca==='T'?yT:yB],[SX(2)-15+off,cb==='T'?yT:yB]]),...ep(b,kb,cb).reverse()];
+return'M'+p.map(q=>q.join(' ')).join('L')}
+function render(){const N=settle(),Pn=[],badW=wrongSet();
+const pin=(id,r=5)=>{const[x,y]=pc(id),v=N(id),ring=v===1?'#e53935':v===0?'#1e88e5':v==='X'?'#ff9800':'#7a8';
+Pn.push(`<circle data-p="${id}" cx="${x}" cy="${y}" r="${id===pend?9:r}" fill="#e6c25a" stroke="${ring}" stroke-width="2.5" style="cursor:crosshair"/>`)};
+const T=(x,y,t,z=10,a='middle',f='#fff')=>`<text x="${x}" y="${y}" fill="${f}" font-size="${z}" text-anchor="${a}" font-family="system-ui,sans-serif">${t}</text>`;
+let s=`<rect width="980" height="590" rx="10" fill="#1f7a46"/><rect x="6" y="6" width="968" height="578" rx="8" fill="none" stroke="#5fd08e"/>`+T(300,22,'OUTPUT LIGHTS (L0–L15)',11)+T(800,22,'DISPLAYS',11);
+for(let i=0;i<16;i++){const x=36+i*34,v=N('L'+i);s+=`<circle cx="${x}" cy="56" r="10" fill="${v===1?'#ff2a2a':'#3b1111'}" stroke="${v===1?'#ffb0b0':'#000'}" stroke-width="2"/>`+T(x,84,i,9);pin('L'+i)}
+for(let k=0;k<2;k++){const x0=640+k*160,mode=c.dt[k],bcd=mode===0,g=j=>N('D'+k+'.'+j),n=bcd&&[0,1,2,3].every(j=>g(j)!==undefined)?[0,1,2,3].reduce((a,j)=>a+(g(j)===1?1<<j:0),0):99;
+const cm=N('D'+k+'.C'),com=cm===undefined?(mode===2?1:0):cm;
+s+=`<rect x="${x0-4}" y="28" width="120" height="58" rx="4" fill="#0a0a0a"/><g transform="translate(${x0+8} 32) scale(.6)">`;
+SEG.forEach((q,i)=>{const on=bcd?(n<10&&SG[n][i]==='1'):mode===1?(com===0&&g(i)===1):(com===1&&g(i)===0);s+=`<rect x="${q[0]}" y="${q[1]}" width="${q[2]}" height="${q[3]}" rx="2" fill="${on?'#ff3030':'#3a1212'}"/>`});
+s+=`</g><text data-dt="${k}" x="${x0+62}" y="48" fill="#ffd" font-size="12" style="cursor:pointer;text-decoration:underline">${['BCD','CC','CA'][mode]}</text>`;
+if(bcd)for(let j=0;j<4;j++){pin('D'+k+'.'+j,4);s+=T(x0+(j+2)*14,92,'ABCD'[j],8)}else{for(let j=0;j<7;j++){pin('D'+k+'.'+j,4);s+=T(x0+j*14,92,'abcdefg'[j],8)}pin('D'+k+'.C',4);s+=T(x0+98,92,'com',8)}}
+for(let u=0;u<5;u++){const x=SX(u),ic=c.ics.find(i=>i.u===u);
+s+=`<rect data-sock="${u}" x="${x}" y="172" width="150" height="214" rx="6" fill="#145c35" stroke="#8fe0b0" stroke-dasharray="${ic?'0':'5 4'}"/>`+T(x+75,186,'U'+(u+1),11)+T(x+32,189,'+5V',8,'start')+T(x+32,379,'GND',8,'start');pin('VCC'+u,4);pin('GND'+u,4);
+if(!ic)s+=T(x+75,282,'drop chip here',10,'middle','#a8e8c3');
+else{const d=D[ic.t],h=d.n/2,bh=(h-1)*RY+18;
+s+=`<g data-ic="${ic.id}" style="cursor:grab"><rect x="${x+30}" y="196" width="90" height="${bh}" rx="3" fill="#25272d" stroke="#888"/><path d="M${x+65} 196a10 8 0 0 0 20 0" fill="#000"/></g>`+T(x+75,224,ic.t,10,'middle','#ffe9a8')+`<text data-x="${ic.id}" x="${x+134}" y="186" fill="#ffaaaa" font-size="14" style="cursor:pointer">✕</text>`;
+for(let p=1;p<=d.n;p++){const[px,py]=pc(ic.id+'.'+p),l=p<=h;s+=`<text x="${l?px+8:px-8}" y="${py+3}" fill="#ddd" font-size="7" text-anchor="${l?'start':'end'}" pointer-events="none">${d.nm[p-1]}</text>`;pin(ic.id+'.'+p)}}}
+s+=T(290,418,'SWITCHES (up = 1, down = 0)',11)+T(780,418,'CLOCK · PULSE · POWER',11);
+for(let i=0;i<16;i++){const x=36+i*34,on=c.sw[i];s+=`<rect data-sw="${i}" x="${x-11}" y="462" width="22" height="48" rx="4" fill="#0b3a20" stroke="#8fd" style="cursor:pointer"/><rect data-sw="${i}" x="${x-8}" y="${on?465:486}" width="16" height="20" rx="3" fill="${on?'#e33':'#bbb'}" stroke="#222" style="cursor:pointer"/>`+T(x,526,'SW'+i,8)+T(x,540,on,10);pin('S'+i)}
+s+=T(640,470,'CLOCK',10)+T(740,470,'PULSE',10)+T(850,470,'+5V',11)+T(920,470,'GND',11)+T(640,490,'now '+c.clk,11)+`<circle data-pb="1" cx="740" cy="500" r="18" fill="${c.pul?'#ff7777':'#c11'}" stroke="#fff" stroke-width="3" style="cursor:pointer"/>`;
+pin('CLK');pin('PUL');pin('VCC');pin('GND');
+c.wires.forEach((w,i)=>{const d=route(w,i);if(badW.has(i))s+=`<path d="${d}" fill="none" stroke="#ff0000" stroke-width="8" opacity=".5" stroke-dasharray="4 5" pointer-events="none"/>`;s+=`<path data-w="${i}" d="${d}" fill="none" stroke="transparent" stroke-width="12" style="cursor:pointer"/><path d="${d}" fill="none" stroke="${w[2]}" stroke-width="2.5" stroke-linejoin="round" pointer-events="none"/>`});
+$('b').innerHTML=s+Pn.join('');
+const m=[];c.ics.forEach(ic=>{if(!ic.pw)m.push('⚠ '+ic.t+' in U'+(ic.u+1)+' has no power: wire the +5V point of its socket to pin '+D[ic.t].vcc+' and the GND point to pin '+D[ic.t].gnd+'.')});
+N.bad.length&&m.push('⚠ Two outputs are joined together and fight each other. Remove one wire.');$('warn').innerHTML=m.map(x=>`<div class="warn">${x}</div>`).join('');$('cst').textContent='Clock = '+c.clk+' · pulses: '+ck}
+function addIC(t,u){push();c.ics.push({id:'I'+(++cnt),t,u,out:{},s:{}});render()}
+function removeIC(id){push();c.ics=c.ics.filter(i=>i.id!==id);c.wires=c.wires.filter(w=>!w[0].startsWith(id+'.')&&!w[1].startsWith(id+'.'));render()}
+function info(id){const m=id.match(/^(I\d+)\.(\d+)$/);if(!m)return id;const ic=c.ics.find(i=>i.id===m[1]),d=D[ic.t],p=+m[2];return`${ic.t} pin ${p} = <b>${d.nm[p-1]}</b> (${p===d.vcc?'power +5V':p===d.gnd?'power ground':d.out.includes(p)?'output':'input'})`}
+$('b').addEventListener('click',e=>{const t=e.target,{p,w,sw,x,dt}=t.dataset;
+if(x){removeIC(x);return}if(dt!==undefined){push();c.dt[dt]=(c.dt[dt]+1)%3;render();return}if(sw!==undefined){push();c.sw[sw]^=1;render();return}
+if(w!==undefined){push();c.wires.splice(+w,1);msg('Wire removed. Use Undo to bring it back.');render();return}
+if(p){if(!pend){pend=p;msg('Selected: '+info(p)+'. Now tap the pin you want to connect it to.')}
+else{if(pend!==p){push();c.wires.push([pend,p,pend==='VCC'||p==='VCC'?'#e53935':pend==='GND'||p==='GND'?'#1e6fe0':wcol[c.wires.length%wcol.length]]);msg('Connected ✔ '+info(pend)+' → '+info(p));liveCheck(pend,p)}pend=null}render();return}
+if(pend){pend=null;render()}});
+$('b').addEventListener('pointerdown',e=>{const t=e.target;if(t.dataset.pb){c.pul=1;ck++;render()}
+const g=t.closest('[data-ic]');if(g){const ic=c.ics.find(i=>i.id===g.dataset.ic);drag={id:ic.id,t:ic.t,x:e.clientX,y:e.clientY}}});
+$('tok').addEventListener('pointerdown',e=>{drag={t:$('icsel').value,x:e.clientX,y:e.clientY,tap:1};e.preventDefault()});
+addEventListener('pointermove',e=>{if(!drag)return;if(!ghost&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>6){ghost=document.createElement('div');ghost.className='chip ghost';ghost.textContent=drag.t;document.body.appendChild(ghost);msg('Drop the chip on a socket. Drop it outside the board to remove it.')}
+if(ghost){ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';e.preventDefault();hit(e,1)}},{passive:false});
+function hit(e,hl){let u=-1;document.querySelectorAll('[data-sock]').forEach(s=>{const q=s.getBoundingClientRect(),i=e.clientX>q.left&&e.clientX<q.right&&e.clientY>q.top&&e.clientY<q.bottom;if(i)u=+s.dataset.sock;if(hl)s.setAttribute('fill',i?'#1f8a50':'#145c35')});return u}
+addEventListener('pointerup',e=>{if(c.pul){c.pul=0;render()}if(!drag)return;const d=drag;drag=null;
+if(ghost){ghost.remove();ghost=null;const u=hit(e,0),r=$('b').getBoundingClientRect(),inside=e.clientX>r.left&&e.clientX<r.right&&e.clientY>r.top&&e.clientY<r.bottom;
+if(u>=0){const occ=c.ics.find(i=>i.u===u);if(occ&&occ.id!==d.id){msg('That socket already has a chip. Remove it first with ✕.');render()}
+else if(d.id){push();c.ics.find(i=>i.id===d.id).u=u;msg('Chip moved ✔ (wires stay connected)');render()}else{addIC(d.t,u);msg('Placed '+d.t+' ✔ Now connect its pins with wires.')}}
+else if(!inside&&d.id){removeIC(d.id);msg('Chip removed.')}else render()}
+else if(d.tap){const u=[0,1,2,3,4].find(k=>!c.ics.some(i=>i.u===k));if(u===undefined)msg('All 5 sockets are full. Remove a chip first.');else{addIC(d.t,u);msg('Placed '+d.t+' in socket U'+(u+1)+' ✔')}}});
+const tick=()=>{c.clk^=1;if(c.clk)ck++;render()};
+$('cs').onclick=()=>{clearInterval(tm);tm=setInterval(tick,500/Math.min(50,Math.max(.1,+$('hz').value||1)))};$('cp').onclick=()=>clearInterval(tm);
+$('c1').onclick=()=>{c.clk=1;ck++;render();c.clk=0;render()};$('hz').onchange=()=>{if(tm)$('cs').onclick()};
+$('undo').onclick=()=>{if(hist.length)restore(hist.pop())};$('clr').onclick=()=>{push();c.ics=[];c.wires=[];c.sw.fill(0);cnt=0;pend=null;render()};
+$('auto').onchange=e=>{c.auto=e.target.checked;render()};
+function load(ics,wires,t){push();c.ics=ics.map(([id,tp,u])=>({id,t:tp,u,out:{},s:{}}));c.wires=wires.map((w,i)=>[w[0],w[1],wcol[i%8]]);c.sw.fill(0);c.dt=[0,0];cnt=ics.length;pend=null;render();msg(t)}
+$('ex1').onclick=()=>load([['I1','74LS86',0],['I2','74LS08',1]],[['S0','I1.1'],['S0','I2.1'],['S1','I1.2'],['S1','I2.2'],['I1.3','L0'],['I2.3','L1']],'Half adder: SW0 = A, SW1 = B. L0 = SUM (XOR chip), L1 = CARRY (AND chip). Flip the switches!');
+$('ex2').onclick=()=>load([['I1','74LS161',0]],[['CLK','I1.2'],['I1.14','L0'],['I1.13','L1'],['I1.12','L2'],['I1.11','L3'],['I1.14','D0.0'],['I1.13','D0.1'],['I1.12','D0.2'],['I1.11','D0.3']],'Counter: press ▶ Start. L0–L3 count in binary and the display shows the number (0–9). Unconnected control pins stay HIGH, so it keeps counting.');
+$('ex3').onclick=()=>load([['I1','74LS283',0]],[['S0','I1.5'],['S1','I1.3'],['S2','I1.6'],['S3','I1.2'],['I1.4','L0'],['I1.1','L1'],['I1.13','L2'],['I1.10','L3'],['I1.9','L4']],'4-bit adder: SW0–SW1 = first number, SW2–SW3 = second number. L0–L4 show the answer in binary.');
+/* ===== chip picker (drop-down) ===== */
+$('icsel').innerHTML=Object.keys(D).map(k=>`<option value="${k}">${k} – ${D[k].desc}</option>`).join('');
+const tokUp=()=>$('tok').textContent=$('icsel').value+' ⇢ drag me';$('icsel').onchange=tokUp;tokUp();
+$('addic').onclick=()=>{const u=[0,1,2,3,4].find(k=>!c.ics.some(i=>i.u===k));if(u===undefined)msg('All 5 sockets are full. Remove a chip first.');else{addIC($('icsel').value,u);msg('Placed '+$('icsel').value+' in socket U'+(u+1)+' ✔ Now wire its power pins: +5V point → VCC pin, GND point → GND pin.')}};
+
+/* ===== alerts and wiring rules ===== */
+let cur=null,RC=null;
+const alertMsg=h=>{const a=$('alert');a.hidden=false;a.innerHTML=h+' <button onclick="this.parentNode.hidden=true">OK</button>'};
+const norm=a=>a.replace(/^(VCC|GND)\d$/,'$1');
+function cls(ws){const P={},S=new Set(),f=a=>{a=norm(a);P[a]=P[a]??a;while(P[a]!==a){P[a]=P[P[a]];a=P[a]}return a};ws.forEach(w=>{S.add(norm(w[0]));S.add(norm(w[1]));const r=f(w[1]);P[f(w[0])]=r});return{f,has:a=>S.has(norm(a))}}
+const canon=id=>{const m=id.match(/^(I\d+)\.(\d+)$/);if(!m)return id;const ic=c.ics.find(i=>i.id===m[1]);return ic?'I'+(ic.u+1)+'.'+m[2]:id};
+const typeAt=u=>(c.ics.find(i=>i.u===u)||{}).t||((PR[cur]||{chips:[]}).chips.find(x=>x[0]===u)||[])[1];
+function nice(id){let m;if(m=id.match(/^I(\d+)\.(\d+)$/)){const t=typeAt(m[1]-1),nm=t&&D[t].nm[m[2]-1];return`U${m[1]} ${t||'chip'} pin ${m[2]}${nm?' ('+nm+')':''}`}
+if(m=id.match(/^(VCC|GND)(\d)$/))return(m[1]==='VCC'?'+5V':'GND')+' point of U'+(+m[2]+1);if(id==='VCC')return'+5V rail';if(id==='GND')return'GND rail';
+if(m=id.match(/^S(\d+)$/))return'switch SW'+m[1];if(m=id.match(/^L(\d+)$/))return'light L'+m[1];if(id==='CLK')return'clock';if(id==='PUL')return'pulse button';m=id.match(/^D(\d)\.(\d)/);return m?'display '+(+m[1]+1)+' input '+'ABCD'[m[2]]:id}
+function role(id){let m;if(m=id.match(/^(I\d+)\.(\d+)$/)){const ic=c.ics.find(i=>i.id===m[1]);if(!ic)return'';const d=D[ic.t],p=+m[2];return p===d.vcc?'vcc':p===d.gnd?'gnd':d.nm[p-1]==='NC'?'nc':d.out.includes(p)?'out':'in'}
+return/^VCC/.test(id)?'p5':/^GND/.test(id)?'p0':/^[LD]/.test(id)?'led':'src'}
+function ruleMsg(a,b){const x=role(a),y=role(b),has=(r,q)=>x===r&&y===q||x===q&&y===r,n=id=>nice(canon(id));
+if(has('p5','p0'))return`⚠ SHORT CIRCUIT! +5V is joined to GND (${n(a)} ↔ ${n(b)}). Remove this wire now.`;
+if(x==='out'&&y==='out')return`⚠ Two outputs are joined (${n(a)} ↔ ${n(b)}). Outputs must never be connected together.`;
+if(x==='nc'||y==='nc')return`⚠ Wrong pin: ${n(x==='nc'?a:b)} has no connection inside the chip (NC). Use another pin.`;
+if(x==='vcc'&&y!=='p5'&&y!=='vcc'||y==='vcc'&&x!=='p5'&&x!=='vcc')return`⚠ The chip’s power pin (VCC) must go only to +5V, not to ${n(x==='vcc'?b:a)}.`;
+if(x==='gnd'&&y!=='p0'&&y!=='gnd'||y==='gnd'&&x!=='p0'&&x!=='gnd')return`⚠ The chip’s ground pin must go only to GND, not to ${n(x==='gnd'?b:a)}.`;
+if(has('out','p5')||has('out','p0'))return`⚠ An output pin is joined to power (${n(a)} ↔ ${n(b)}). This can damage the chip.`;
+if(has('out','src'))return`⚠ A switch or clock should drive inputs, not a chip output (${n(a)} ↔ ${n(b)}).`;return''}
+const sameRef=(a,b)=>RC.has(a)&&RC.has(b)&&RC.f(a)===RC.f(b);
+function wrongSet(){const s=new Set();c.wires.forEach((w,i)=>{if(ruleMsg(w[0],w[1]))s.add(i);else if(RC&&!sameRef(canon(w[0]),canon(w[1])))s.add(i)});return s}
+function liveCheck(a,b){const m=ruleMsg(a,b);if(m){alertMsg(m);return}
+if(RC){const ca=canon(a),cb=canon(b),p=PR[cur];if(!sameRef(ca,cb)){const hint=x=>RC.has(x)?'<br>💡 '+nice(x)+' should connect to: '+p.wires.filter(w=>norm(w[0])===norm(x)||norm(w[1])===norm(x)).map(w=>nice(norm(w[0])===norm(x)?w[1]:w[0])).slice(0,3).join(', '):'<br>💡 '+nice(x)+' is not used in this practical.';
+alertMsg(`⚠ Wrong connection for this practical: ${nice(ca)} ↔ ${nice(cb)}.`+hint(ca)+hint(cb));return}}
+$('alert').hidden=true}
+
+/* ===== practicals 1-4 ===== */
+const pw=(u,t)=>[['VCC'+u,'I'+(u+1)+'.'+D[t].vcc],['GND'+u,'I'+(u+1)+'.'+D[t].gnd]];
+const L138='74LS138',L20='74LS20',Yp={0:15,1:14,2:13,3:12,4:11,5:10,6:9,7:7};
+const en138=[['I1.6','VCC'],['I1.4','GND'],['I1.5','GND']],sel=(a,b,d)=>[[a,'I1.1'],[b,'I1.2'],[d,'I1.3']];
+const g20=(u,k,ms,out)=>{const b=k?[9,10,12,13]:[1,2,4,5],I='I'+(u+1)+'.';return[...ms.map((m,i)=>['I1.'+Yp[m],I+b[i]]),[I+(k?8:6),out]]};
+const base138=[...pw(0,L138),...en138],X3=[0,1,2],q90=(u,l,d)=>[12,9,8,11].flatMap((p,i)=>[['I'+u+'.'+p,'L'+(l+i)],['I'+u+'.'+p,'D'+d+'.'+i]]);
+const clk90=[['CLK','I1.14'],['I1.12','I1.1']],r9=u=>[['GND','I'+u+'.6'],['GND','I'+u+'.7']];
+const T138='Put the 74LS138 in U1 and the other chip(s) in the sockets named above (drag from the drop-down).',PW='Wire every chip’s power: +5V point of its socket → VCC pin, GND point → GND pin.';
+const PR=[
+{n:'1a. Full Adder – 74LS138 + 74LS20',aim:'Make a full adder: Sum = Σm(1,2,4,7), Carry = Σm(3,5,6,7). The 74LS138 outputs go LOW, so a NAND gate turns them into HIGH answers.',
+chips:[[0,L138],[1,L20]],wires:[...base138,...pw(1,L20),...sel('S0','S1','S2'),...g20(1,0,[1,2,4,7],'L0'),...g20(1,1,[3,5,6,7],'L1')],ins:X3,outs:[0,1],ih:['A','B','Cin'],oh:['Sum','Carry'],f:([a,b,d])=>[a^b^d,+(a+b+d>1)],
+st:[T138,PW,'Enable pins: G1 (pin 6) → +5V, G2A (pin 4) and G2B (pin 5) → GND.','SW0 = A, SW1 = B, SW2 = Cin → decoder pins 1, 2, 3.','Y1,Y2,Y4,Y7 → NAND gate 1 → L0 (Sum). Y3,Y5,Y6,Y7 → NAND gate 2 → L1 (Carry).']},
+{n:'1b. Full Subtractor – 74LS138 + 74LS20',aim:'Make a full subtractor (A − B − Bin): Difference = Σm(1,2,4,7), Borrow = Σm(1,2,3,7).',
+chips:[[0,L138],[1,L20]],wires:[...base138,...pw(1,L20),...sel('S2','S1','S0'),...g20(1,0,[1,2,4,7],'L0'),...g20(1,1,[1,2,3,7],'L1')],ins:X3,outs:[0,1],ih:['A','B','Bin'],oh:['Diff','Borrow'],f:([a,b,i])=>[a^b^i,+(a-b-i<0)],
+st:[T138,PW,'Enable pins: G1 → +5V, G2A and G2B → GND.','SW0 = A goes to the MSB pin C (pin 3), SW1 = B → pin 2, SW2 = Bin → pin 1 (A, the LSB).','Y1,Y2,Y4,Y7 → NAND gate 1 → L0 (Difference). Y1,Y2,Y3,Y7 → NAND gate 2 → L1 (Borrow).']},
+{n:'2a. Binary to Gray converter – 74LS138 + 2× 74LS20',aim:'Convert 3-bit binary (B2 B1 B0) to Gray code: G2 = B2, G1 = B2⊕B1, G0 = B1⊕B0.',
+chips:[[0,L138],[1,L20],[2,L20]],wires:[...base138,...pw(1,L20),...pw(2,L20),...sel('S0','S1','S2'),...g20(1,0,[4,5,6,7],'L2'),...g20(1,1,[2,3,4,5],'L1'),...g20(2,0,[1,2,5,6],'L0')],ins:X3,outs:[0,1,2],ih:['B0','B1','B2'],oh:['G0','G1','G2'],f:([b0,b1,b2])=>[b1^b0,b2^b1,b2],
+st:[T138,PW,'Enable pins: G1 → +5V, G2A and G2B → GND.','SW0 = B0, SW1 = B1, SW2 = B2 (MSB).','G2 = Σm(4,5,6,7) → L2.  G1 = Σm(2,3,4,5) → L1.  G0 = Σm(1,2,5,6) → L0 (each through a NAND gate).']},
+{n:'2b. Gray to Binary converter – 74LS138 + 2× 74LS20',aim:'Convert 3-bit Gray code (G2 G1 G0) to binary: B2 = G2, B1 = G2⊕G1, B0 = G2⊕G1⊕G0.',
+chips:[[0,L138],[1,L20],[2,L20]],wires:[...base138,...pw(1,L20),...pw(2,L20),...sel('S0','S1','S2'),...g20(1,0,[4,5,6,7],'L2'),...g20(1,1,[2,3,4,5],'L1'),...g20(2,0,[1,2,4,7],'L0')],ins:X3,outs:[0,1,2],ih:['G0','G1','G2'],oh:['B0','B1','B2'],f:([g0,g1,g2])=>[g2^g1^g0,g2^g1,g2],
+st:[T138,PW,'Enable pins: G1 → +5V, G2A and G2B → GND.','SW0 = G0, SW1 = G1, SW2 = G2 (MSB).','B2 = Σm(4,5,6,7) → L2.  B1 = Σm(2,3,4,5) → L1.  B0 = Σm(1,2,4,7) → L0 (each through a NAND gate).']},
+{n:'3a. 8:1 MUX from 4:1 MUX – 74LS153 + 74LS04 + 74LS32',aim:'Build an 8:1 multiplexer from the dual 4:1 MUX. S2 chooses which half works; an inverter and an OR gate join the halves.',
+chips:[[0,'74LS153'],[1,'74LS04'],[2,'74LS32']],wires:[...pw(0,'74LS153'),...pw(1,'74LS04'),...pw(2,'74LS32'),['S0','I1.6'],['S1','I1.5'],['S2','I1.4'],['S3','I1.3'],['S4','I1.10'],['S5','I1.11'],['S6','I1.12'],['S7','I1.13'],['S8','I1.14'],['S9','I1.2'],['S10','I1.1'],['S10','I2.1'],['I2.2','I1.15'],['I1.7','I3.1'],['I1.9','I3.2'],['I3.3','L0']],
+ins:[0,1,2,3,4,5,6,7,8,9,10],outs:[0],f:b=>[b[b[8]+2*b[9]+4*b[10]]],
+st:['U1 = 74LS153, U2 = 74LS04, U3 = 74LS32.',PW,'SW0–SW3 → 1C0–1C3 (pins 6,5,4,3). SW4–SW7 → 2C0–2C3 (pins 10,11,12,13).','SW8 → A (pin 14), SW9 → B (pin 2): these are S0 and S1 for both halves.','SW10 (S2) → /1G (pin 1) and → inverter input (U2 pin 1). Inverter output (U2 pin 2) → /2G (pin 15).','1Y (pin 7) and 2Y (pin 9) → OR gate inputs (U3 pins 1, 2). OR output (U3 pin 3) → L0.']},
+{n:'3b. Boolean function F(A,B,C,D) = Σm(1,2,4,5,9,11,14,15) – 74LS153',aim:'Implement a 4-variable function with the 74LS153 used as an 8:1 MUX. A, B, C choose the input; D, D′, 0 or 1 feed the data pins.',
+chips:[[0,'74LS153'],[1,'74LS04'],[2,'74LS32']],wires:[...pw(0,'74LS153'),...pw(1,'74LS04'),...pw(2,'74LS32'),['S0','I1.6'],['S0','I2.3'],['I2.4','I1.5'],['VCC','I1.4'],['GND','I1.3'],['S0','I1.10'],['S0','I1.11'],['GND','I1.12'],['VCC','I1.13'],['S1','I1.14'],['S2','I1.2'],['S3','I1.1'],['S3','I2.1'],['I2.2','I1.15'],['I1.7','I3.1'],['I1.9','I3.2'],['I3.3','L0']],
+ins:[0,1,2,3],outs:[0],ih:['D','C','B','A'],oh:['F'],f:([d,c2,b,a])=>[+[1,2,4,5,9,11,14,15].includes(8*a+4*b+2*c2+d)],
+st:['U1 = 74LS153, U2 = 74LS04, U3 = 74LS32. '+PW,'Data table: I0 = D, I1 = D′, I2 = 1, I3 = 0, I4 = D, I5 = D, I6 = 0, I7 = 1.','SW0 = D → 1C0 (pin 6), 2C0 (pin 10), 2C1 (pin 11) and the inverter (U2 pin 3). Inverter output (U2 pin 4) → 1C1 (pin 5).','+5V rail → 1C2 (pin 4) and 2C3 (pin 13). GND rail → 1C3 (pin 3) and 2C2 (pin 12).','SW1 = C → A (pin 14). SW2 = B → B (pin 2). SW3 = A → /1G (pin 1) and inverter (U2 pin 1); inverter out (U2 pin 2) → /2G (pin 15).','1Y and 2Y → OR gate (U3) → L0 = F.']},
+{n:'4a. MOD-6 counter – 74LS90',aim:'Count 0 to 5 and restart. When the count reaches 6 (QB and QC high) the reset pins clear the counter.',
+chips:[[0,'74LS90']],wires:[...pw(0,'74LS90'),...clk90,['I1.9','I1.2'],['I1.8','I1.3'],...r9(1),...q90(1,0,0)],seq:{o:[0,1,2,3],n:13,mod:6},
+st:['U1 = 74LS90. '+PW,'Clock → CKA (pin 14). QA (pin 12) → CKB (pin 1).','QB (pin 9) → R01 (pin 2). QC (pin 8) → R02 (pin 3).','R91 and R92 (pins 6, 7) → GND, so the “set to 9” is off.','QA, QB, QC, QD → L0–L3 and display 1. Press ▶ Start.']},
+{n:'4b. MOD-7 counter – 74LS90 + 74LS08',aim:'Count 0 to 6. Reset when the count is 7 (QA, QB, QC all high) using an AND gate.',
+chips:[[0,'74LS90'],[1,'74LS08']],wires:[...pw(0,'74LS90'),...pw(1,'74LS08'),...clk90,['I1.12','I2.1'],['I1.9','I2.2'],['I2.3','I1.2'],['I1.8','I1.3'],...r9(1),...q90(1,0,0)],seq:{o:[0,1,2,3],n:15,mod:7},
+st:['U1 = 74LS90, U2 = 74LS08. '+PW,'Clock → CKA. QA → CKB.','QA and QB → AND gate inputs (U2 pins 1, 2). AND output (U2 pin 3) → R01 (pin 2). QC → R02 (pin 3).','R91, R92 → GND.','QA–QD → L0–L3 and display 1.']},
+{n:'4c. MOD-24 two-digit counter (MOD-NN) – 2× 74LS90 + 74LS08',aim:'Two decade counters in a row count 00 to 23. Units chip counts every clock; tens chip counts when the units chip rolls over. At 24 both reset.',
+chips:[[0,'74LS90'],[1,'74LS90'],[2,'74LS08']],wires:[...pw(0,'74LS90'),...pw(1,'74LS90'),...pw(2,'74LS08'),...clk90,['I1.11','I2.14'],['I2.12','I2.1'],['I2.9','I3.1'],['I1.8','I3.2'],['I3.3','I1.2'],['I3.3','I1.3'],['I3.3','I2.2'],['I3.3','I2.3'],...r9(1),...r9(2),...q90(1,0,0),...q90(2,4,1)],
+seq:{o:[0,1,2,3,4,5,6,7],n:50,mod:24,dec:b=>b[0]+2*b[1]+4*b[2]+8*b[3]+10*(b[4]+2*b[5]+4*b[6]+8*b[7])},
+st:['U1 = units 74LS90, U2 = tens 74LS90, U3 = 74LS08. '+PW,'Clock → U1 CKA. U1 QA → U1 CKB. U1 QD (pin 11) → U2 CKA (pin 14). U2 QA → U2 CKB.','Tens QB (U2 pin 9) → AND input (U3 pin 1). Units QC (U1 pin 8) → AND input (U3 pin 2).','AND output (U3 pin 3) → R01 and R02 of BOTH chips (U1 pins 2,3 and U2 pins 2,3).','R91, R92 of both chips → GND.','Units QA–QD → L0–L3 and display 1. Tens QA–QD → L4–L7 and display 2.']}];
+$('prsel').innerHTML='<option value="">— Free play (no practical) —</option>'+PR.map((p,i)=>`<option value="${i}">${p.n}</option>`).join('');
+function prInfo(){const p=PR[cur],e=$('prinfo');if(!p){e.hidden=true;return}e.hidden=false;let t='';
+if(p.ins&&p.ins.length<=4){const k=p.ins.length;t='<table><tr>'+p.ih.map(h=>`<th>${h}</th>`).join('')+'<th></th>'+p.oh.map(h=>`<th>${h}</th>`).join('')+'</tr>'+Array.from({length:1<<k},(_,m)=>{const b=p.ins.map((_,j)=>m>>j&1);return'<tr>'+b.map(v=>`<td>${v}</td>`).join('')+'<td>→</td>'+p.f(b).map(v=>`<td>${v}</td>`).join('')+'</tr>'}).join('')+'</table>'}
+e.innerHTML=`<b>${p.n}</b><br>${p.aim}<br><b>Chips:</b> ${p.chips.map(([u,t])=>`U${u+1} = ${t}`).join(', ')}<ol>${p.st.map(s=>`<li>${s}</li>`).join('')}</ol>${t}`}
+$('prsel').onchange=()=>{cur=$('prsel').value===''?null:+$('prsel').value;RC=cur===null?null:cls(PR[cur].wires);prInfo();$('prres').hidden=true;$('tcv').hidden=true;$('alert').hidden=true;render()};
+$('prbuild').onclick=()=>{const p=PR[cur];if(!p){msg('Choose a practical first (drop-down above).');return}push();c.ics=p.chips.map(([u,t])=>({id:'I'+(u+1),t,u,out:{},s:{}}));cnt=Math.max(...p.chips.map(x=>x[0]+1));c.sw.fill(0);c.dt=[0,0];c.auto=false;$('auto').checked=false;
+c.wires=p.wires.map((w,i)=>[w[0],w[1],/VCC/.test(w[0]+w[1])?'#e53935':/GND/.test(w[0]+w[1])?'#1e6fe0':wcol[i%8]]);pend=null;$('alert').hidden=true;render();msg('Built: '+p.n+'. Now flip the switches (or press ▶ Start for counters). Try “Check my circuit” too. You can also press Clear all and build it yourself!')};
+function runTest(p){const sw0=[...c.sw],clk0=c.clk,rs=()=>c.ics.forEach(i=>{i.s={};i.out={};i.pri=0});rs();let pass=0,tot=0;const bad=[];
+if(p.seq){c.clk=0;c.sw.fill(0);settle();for(let n=1;n<=p.seq.n;n++){c.clk=1;settle();c.clk=0;const N=settle(),b=p.seq.o.map(l=>N('L'+l)===1?1:0),v=p.seq.dec?p.seq.dec(b):b.reduce((s,x,i)=>s+(x<<i),0),e=n%p.seq.mod;tot++;if(v===e)pass++;else bad.push(`after ${n} clock pulse(s): got ${v}, expected ${e}`)}}
+else for(let m=0;m<1<<p.ins.length;m++){const b=p.ins.map((_,j)=>m>>j&1);p.ins.forEach((s,j)=>c.sw[s]=b[j]);const N=settle(),g=p.outs.map(l=>N('L'+l)===1?1:0),e=p.f(b);tot++;if(g.join()===e.join())pass++;else bad.push(`inputs ${b.join('')} → got ${g.join('')}, expected ${e.join('')}`)}
+c.sw=sw0;c.clk=clk0;rs();return{pass,tot,bad}}
+$('prchk').onclick=()=>{const p=PR[cur],r=$('prres');r.hidden=false;if(!p){r.innerHTML='Choose a practical first (drop-down above).';return}
+const o=new Set;p.chips.forEach(([u,t])=>{const ic=c.ics.find(i=>i.u===u);if(!ic)o.add(`Put <b>${t}</b> in socket <b>U${u+1}</b>.`);else if(ic.t!==t)o.add(`Socket <b>U${u+1}</b> has ${ic.t}, but this practical needs <b>${t}</b>.`)});
+const rc=cls(p.wires),uc=cls(c.wires.map(w=>[canon(w[0]),canon(w[1])]));
+p.wires.forEach(([a,b])=>{if(uc.f(a)!==uc.f(b))o.add(`Missing wire: ${nice(a)} → ${nice(b)}`)});
+c.wires.forEach(w=>{const a=canon(w[0]),b=canon(w[1]);if(!(rc.has(a)&&rc.has(b)&&rc.f(a)===rc.f(b)))o.add(`Wrong wire (dashed red on the board): ${nice(a)} ↔ ${nice(b)}`)});
+const L=[...o];let h=L.length?`<div class="bad"><b>✖ ${L.length} problem(s) found:</b><ul>${L.slice(0,8).map(x=>`<li>${x}</li>`).join('')}</ul>${L.length>8?'…and '+(L.length-8)+' more.':''}</div>`:'';
+if(!L.some(x=>/^Put|^Socket/.test(x))){const t=runTest(p);h+=t.pass===t.tot?`<div class="ok"><b>✔ All ${t.tot} test${t.tot>1?'s':''} passed.</b> ${L.length?'The logic works, but fix the wiring problems above.':'Perfect – your circuit works!'}</div>`:`<div class="bad"><b>✖ Test result: ${t.pass} of ${t.tot} correct.</b> First mistakes: ${t.bad.slice(0,4).join(' · ')}</div>`}
+r.innerHTML=h;render()};
+function drawTiming(names,S){const cv=$('tcv'),h=34,L=60,W=900,n=S.length;cv.hidden=false;cv.width=W;cv.height=names.length*h+34;const x=cv.getContext('2d'),st=getComputedStyle(document.documentElement),fg=st.getPropertyValue('--fg').trim(),bd=st.getPropertyValue('--bd').trim(),dx=(W-L-10)/n;
+x.font='12px system-ui';names.forEach((nm,k)=>{const y0=22+k*h+h-8,y1=y0-h+14;x.fillStyle=fg;x.fillText(nm,8,(y0+y1)/2+4);x.strokeStyle=bd;x.lineWidth=1;x.beginPath();for(let i=0;i<=n;i++){x.moveTo(L+i*dx,y1-4);x.lineTo(L+i*dx,y0+4)}x.stroke();
+x.strokeStyle=nm==='CLK'?'#2e9d4f':'#2563eb';x.lineWidth=2;x.beginPath();S.forEach((r,i)=>{const y=r[k]?y1:y0;if(i)x.lineTo(L+i*dx,y);else x.moveTo(L,y);x.lineTo(L+(i+1)*dx,y)});x.stroke()});x.fillStyle=fg;x.fillText('Time →   (each box = one half clock step)',L,names.length*h+28)}
+$('prtim').onclick=()=>{const p=PR[cur];if(!p){alertMsg('Choose a practical first.');return}if(!p.seq&&p.ins.length>4){alertMsg('The timing diagram works for the counters and for small circuits (up to 4 inputs).');return}
+const sw0=[...c.sw],clk0=c.clk,names=[],S=[],rs=()=>c.ics.forEach(i=>{i.s={};i.out={};i.pri=0});rs();
+if(p.seq){c.clk=0;c.sw.fill(0);settle();const o=p.seq.o,T=Math.min(p.seq.mod*2+2,26);names.push('CLK',...o.map(l=>'L'+l));const rec=()=>{const N=settle();S.push([c.clk,...o.map(l=>N('L'+l)===1?1:0)])};rec();for(let i=0;i<T;i++){c.clk=1;rec();c.clk=0;rec()}}
+else{names.push(...p.ins.map(s=>'SW'+s),...p.outs.map(l=>'L'+l));for(let m=0;m<1<<p.ins.length;m++){p.ins.forEach((s,j)=>c.sw[s]=m>>j&1);const N=settle();S.push([...p.ins.map((_,j)=>m>>j&1),...p.outs.map(l=>N('L'+l)===1?1:0)])}}
+c.sw=sw0;c.clk=clk0;rs();drawTiming(names,S);render()};
+
+/* ===== analog lab (practicals 5-9) ===== */
+const fmt=v=>!isFinite(v)?'∞':v===0?'0':Math.abs(v)>=1e6?+(v/1e6).toPrecision(3)+'M':Math.abs(v)>=1e3?+(v/1e3).toPrecision(3)+'k':Math.abs(v)<.01?v.toExponential(2):+v.toPrecision(3);
+const PI2=2*Math.PI,gv=id=>+$('a_'+id).value,gs=id=>$('a_'+id).value,par=(...r)=>1/r.reduce((s,x)=>s+1/x,0),tb=r=>'<table>'+r.map(([k,v,u])=>`<tr><td>${k}</td><td><b>${v}</b> ${u||''}</td></tr>`).join('')+'</table>';
+function plot(i,S,o){const cv=$('cv'+i),x=cv.getContext('2d'),W=cv.width,H=cv.height,L=64,R=16,T=26,B=36,st=getComputedStyle(document.documentElement),fg=st.getPropertyValue('--fg').trim(),bd=st.getPropertyValue('--bd').trim();
+x.clearRect(0,0,W,H);x.font='12px system-ui';const lx=v=>o.log?Math.log10(v):v,a=lx(o.x0),b=lx(o.x1),px=v=>L+(lx(v)-a)/(b-a)*(W-L-R),py=v=>H-B-(v-o.y0)/(o.y1-o.y0)*(H-T-B);
+x.fillStyle=fg;x.strokeStyle=bd;x.lineWidth=1;x.textAlign='center';x.fillText(o.t,W/2,16);const xs=[];
+if(o.log)for(let k=Math.ceil(a);k<=b;k++)xs.push(10**k);else for(let k=0;k<=6;k++)xs.push(o.x0+(o.x1-o.x0)*k/6);
+xs.forEach(v=>{x.beginPath();x.moveTo(px(v),T);x.lineTo(px(v),H-B);x.stroke();x.fillText(fmt(+v.toPrecision(3)),px(v),H-B+16)});
+x.textAlign='right';for(let k=0;k<=5;k++){const v=o.y0+(o.y1-o.y0)*k/5;x.beginPath();x.moveTo(L,py(v));x.lineTo(W-R,py(v));x.stroke();x.fillText(fmt(+v.toPrecision(3)),L-6,py(v)+4)}
+x.textAlign='center';x.fillText(o.xl,W/2,H-4);x.save();x.translate(14,H/2);x.rotate(-Math.PI/2);x.fillText(o.yl,0,0);x.restore();
+x.save();x.beginPath();x.rect(L,T,W-L-R,H-T-B);x.clip();x.setLineDash([5,4]);x.textAlign='left';
+(o.hl||[]).forEach(h=>{x.strokeStyle=h.c||'#888';x.beginPath();x.moveTo(L,py(h.y));x.lineTo(W-R,py(h.y));x.stroke();x.fillStyle=h.c||fg;x.fillText(h.t,L+4,py(h.y)-4)});
+(o.vl||[]).forEach(h=>{x.strokeStyle=h.c||'#888';x.beginPath();x.moveTo(px(h.x),T);x.lineTo(px(h.x),H-B);x.stroke();x.fillStyle=h.c||fg;x.fillText(h.t,px(h.x)+4,T+12)});x.setLineDash([]);
+S.forEach(s=>{x.strokeStyle=s.c;x.lineWidth=2;x.beginPath();s.x.forEach((v,k)=>k?x.lineTo(px(v),py(s.y[k])):x.moveTo(px(v),py(s.y[k])));x.stroke()});x.restore();
+(o.pt||[]).forEach(q=>{x.fillStyle=q.c||'#e53935';x.beginPath();x.arc(px(q.x),py(q.y),5,0,PI2);x.fill();x.fillStyle=fg;x.textAlign='left';x.fillText(q.t,px(q.x)+8,py(q.y)-6)})}
+function dcb(p){const K=p.K/1e3,RS=p.RS*1e3,VG=p.VDD*p.R2/(p.R1+p.R2),a=K*RS/2,vo=VG-p.Vt,x=vo<=0?0:a<1e-12?vo:(-1+Math.sqrt(1+4*a*vo))/(2*a),ID=K/2*x*x,VS=ID*RS,VD=p.VDD-ID*p.RD*1e3,VDS=VD-VS;return{K,VG,x,ID,VS,VD,VDS,VGS:VG-VS,gm:K*x,sat:x>0&&VDS>=x,off:vo<=0}}
+const idf=(K,Vt,vgs,vds)=>{const v=vgs-Vt;return v<=0?0:vds<v?K*(v*vds-vds*vds/2):K/2*v*v};
+function schm(vf,t0,t1,n,R1,R2,Vs){const U=R2/(R1+R2)*Vs,Lw=-U,t=[],vi=[],vo=[],v0=vf(t0);let o=v0>U?-Vs:Vs;for(let i=0;i<=n;i++){const tt=t0+(t1-t0)*i/n,v=vf(tt);if(o>0&&v>U)o=-Vs;else if(o<0&&v<Lw)o=Vs;t.push(tt);vi.push(v);vo.push(o)}return{t,vi,vo,U,L:Lw}}
+const BIAS=[['VDD','Supply VDD',12,'V'],['R1','R1 (top)',470,'kΩ'],['R2','R2 (bottom)',180,'kΩ'],['RD','RD',3.3,'kΩ'],['RS','RS',1.5,'kΩ'],['K','K = kn′·W/L',2,'mA/V²'],['Vt','Threshold Vt',1,'V']],bp=()=>Object.fromEntries(BIAS.map(f=>[f[0],gv(f[0])]));
+const WAVE='<label>Wave<span><select id="a_wave"><option>sine</option><option>square</option></select></span></label>';
+const AP={
+5:{t:'5. Single-stage Common-Source (CS) amplifier – DC operating point',aim:'An NMOS transistor with a voltage-divider bias (R1, R2), drain resistor RD and source resistor RS. Find the Q-point (ID, VGS, VDS) and check that the transistor is in the saturation region.',f:BIAS,cv:[380],
+st:['VG = VDD·R2 / (R1+R2) – the divider sets the gate voltage.','Solve VGS = VG − ID·RS together with ID = (K/2)(VGS − Vt)².','VD = VDD − ID·RD, VS = ID·RS, VDS = VD − VS.','Saturation check: VDS must be bigger than VGS − Vt. If not, change RD, RS, R1 or R2.','Tip: choose VD about half of VDD for the biggest output swing.'],
+run(){const p=bp(),d=dcb(p),Vov=d.VGS-p.Vt,I0=p.VDD/((p.RD+p.RS)*1e3)*1e3;
+$('ares').innerHTML=tb([['Gate voltage VG',fmt(d.VG),'V'],['VGS',fmt(d.VGS),'V'],['Drain current ID',fmt(d.ID*1e3),'mA'],['VS = ID·RS',fmt(d.VS),'V'],['VD',fmt(d.VD),'V'],['VDS',fmt(d.VDS),'V'],['Overdrive VGS − Vt',fmt(Vov),'V'],['gm = K·(VGS − Vt)',fmt(d.gm*1e3),'mA/V']])+(d.off?'<p class="bad">✖ The transistor is OFF (VG is below Vt). Make R2 bigger or R1 smaller.</p>':d.sat?'<p class="ok">✔ Saturation region – the transistor is correctly biased as an amplifier (VDS ≥ VGS − Vt).</p>':'<p class="bad">✖ Triode region (VDS is too small). Make RD or RS smaller.</p>');
+const S=[1,2,3,4,5].map((k,j)=>{const vg=p.Vt+k*.5,xs=[],ys=[];for(let i=0;i<=80;i++){const v=p.VDD*i/80;xs.push(v);ys.push(idf(p.K/1e3,p.Vt,vg,v)*1e3)}return{x:xs,y:ys,c:['#9aa','#7b9','#59b','#76c','#a6a'][j]}});
+S.push({x:[0,p.VDD],y:[I0,0],c:'#e53935'});plot(0,S,{t:'Output curves (grey/blue) and DC load line (red). Red dot = Q-point',xl:'VDS (V)',yl:'ID (mA)',x0:0,x1:p.VDD,y0:0,y1:Math.max(I0*1.4,d.ID*1.3e3),pt:[{x:d.VDS,y:d.ID*1e3,t:'Q'}]})}},
+6:{t:'6. CS amplifier – frequency response',aim:'Add coupling capacitors, bypass capacitor, load and transistor capacitances. Get the gain Av, input resistance Ri, output resistance Ro, bandwidth, and plot the frequency response.',
+f:[...BIAS,['lam','λ (channel-length modulation)',0.02,'1/V'],['RL','Load RL',10,'kΩ'],['Rs','Source resistance Rsig',1,'kΩ'],['C1','Input coupling Cc1',1,'µF'],['C2','Output coupling Cc2',1,'µF'],['Cs','Source bypass Cs',10,'µF'],['CL','Load capacitor CL',10,'pF'],['Cgs','Cgs',2,'pF'],['Cgd','Cgd',0.5,'pF']],cv:[400],
+st:['Do the DC bias first (practical 5). It gives gm and ID.','Mid-band gain: Av = −gm·(RD ∥ RL ∥ ro), where ro = 1/(λ·ID).','Ri = R1 ∥ R2.  Ro = RD ∥ ro.','Low corner fL comes from Cc1, Cc2 and Cs. High corner fH comes from Cgs, Cgd (Miller effect) and CL.','Bandwidth BW = fH − fL (the −3 dB points on the plot).'],
+run(){const p={...bp(),lam:gv('lam'),RL:gv('RL')*1e3,Rs:gv('Rs')*1e3,C1:gv('C1')*1e-6,C2:gv('C2')*1e-6,Cs:gv('Cs')*1e-6,CL:gv('CL')*1e-12,Cgs:gv('Cgs')*1e-12,Cgd:gv('Cgd')*1e-12},d=dcb(p);
+if(!d.sat){$('ares').innerHTML='<span class="bad">✖ The transistor is not in saturation, so it cannot amplify. Fix the DC bias in practical 5 first.</span>';$('cv0').getContext('2d').clearRect(0,0,900,400);return}
+const gm=d.gm,ro=p.lam>0?1/(p.lam*d.ID):1e9,RS=p.RS*1e3,RD=p.RD*1e3,Rl=par(RD,p.RL,ro),Am=gm*Rl,Ri=par(p.R1*1e3,p.R2*1e3),Ro=par(RD,ro),A0=Am*Ri/(Ri+p.Rs);
+const f1=1/(PI2*(p.Rs+Ri)*p.C1),f2=1/(PI2*(Ro+p.RL)*p.C2),fz=1/(PI2*RS*p.Cs),fps=fz*(1+gm*RS),Cin=p.Cgs+p.Cgd*(1+Am),fh1=1/(PI2*par(p.Rs,Ri)*Cin),fh2=1/(PI2*Rl*(p.CL+p.Cgd));
+const hp=(f,q)=>{const r=f/q;return r/Math.sqrt(1+r*r)},H=f=>A0*hp(f,f1)*hp(f,f2)*Math.sqrt((1+(f/fz)**2)/(1+(f/fps)**2))/Math.sqrt(1+(f/fh1)**2)/Math.sqrt(1+(f/fh2)**2);
+const fs=[],ms=[];for(let k=0;k<=540;k++){const f=10**(k/60);fs.push(f);ms.push(H(f))}const mid=Math.max(...ms),th=mid/Math.SQRT2;let fL=0,fH=0;fs.forEach((f,i)=>{if(ms[i]>=th){if(!fL)fL=f;fH=f}});const db=v=>20*Math.log10(v),top=db(mid)+5;
+$('ares').innerHTML=tb([['Voltage gain Av = −gm·(RD∥RL∥ro)','−'+fmt(Am)+' ('+fmt(db(Am))+' dB)'],['Gain with source resistance Avs','−'+fmt(A0)],['Input resistance Ri = R1∥R2',fmt(Ri),'Ω'],['Output resistance Ro = RD∥ro',fmt(Ro),'Ω'],['gm',fmt(gm*1e3),'mA/V'],['Lower cut-off fL',fmt(fL),'Hz'],['Upper cut-off fH',fmt(fH),'Hz'],['Bandwidth BW = fH − fL',fmt(fH-fL),'Hz']]);
+plot(0,[{x:fs,y:ms.map(db),c:'#2563eb'}],{t:'Frequency response (gain in dB)',xl:'Frequency (Hz)',yl:'Gain (dB)',log:1,x0:1,x1:1e9,y0:top-65,y1:top,hl:[{y:db(th),t:'−3 dB',c:'#e53935'}],pt:[{x:fL,y:db(th),t:'fL'},{x:fH,y:db(th),t:'fH'}]})}},
+7:{t:'7. Op-Amp integrator',aim:'An inverting op-amp with a resistor R at the input and a capacitor C in the feedback. A big resistor Rf across C stops the output from drifting away. The output is the integral of the input.',
+f:[['R','R',10,'kΩ'],['C','C',0.1,'µF'],['Rf','Rf across C (0 = none)',1000,'kΩ'],['fa','Input frequency fa',1000,'Hz'],['Vp','Input amplitude',1,'V'],['Vs','Output limit ±',12,'V']],extra:WAVE,cv:[330,330],
+st:['Ideal integrator: Vout = −(1/RC)∫Vin dt. Gain at frequency f is 1/(2πfRC).','Unity-gain frequency f0 = 1/(2πRC). Pick R and C so that f0 is below fa.','Rf makes a “leaky” integrator: below fc = 1/(2πRf·C) the gain stays flat at Rf/R. Use fa ≫ fc.','A square wave in gives a triangle wave out; a sine in gives a cosine out (leads by 90°).','With Rf = 0 a DC offset can appear and push the output to its limit.'],
+run(){const R=gv('R')*1e3,C=gv('C')*1e-6,Rf=gv('Rf')*1e3,fa=gv('fa'),Vp=gv('Vp'),Vs=gv('Vs'),w=gs('wave'),H=f=>Rf>0?(Rf/R)/Math.sqrt(1+(PI2*f*Rf*C)**2):1/(PI2*f*R*C);
+const f0=1/(PI2*R*C),fc=Rf>0?1/(PI2*Rf*C):0,Ha=H(fa),ph=Rf>0?180-Math.atan(PI2*fa*Rf*C)*180/Math.PI:90,fs=[],ys=[];for(let k=0;k<=400;k++){const f=10**(-1+6*k/400);fs.push(f);ys.push(20*Math.log10(H(f)))}
+const T=1/fa,dt=T/400,vin=t=>w==='sine'?Vp*Math.sin(PI2*fa*t):Vp*(Math.sin(PI2*fa*t)>=0?1:-1);let vo=0;const tt=[],vi=[],vv=[];
+for(let i=0;i<=8*400;i++){const t=i*dt,v=vin(t);if(i>=5*400){tt.push((t-5*T)*1e3);vi.push(v);vv.push(vo)}vo+=dt*(-v/(R*C)-(Rf>0?vo/(Rf*C):0));vo=Math.max(-Vs,Math.min(Vs,vo))}
+const pk=Math.max(...vv.map(Math.abs));$('ares').innerHTML=tb([['Unity-gain frequency f0',fmt(f0),'Hz'],['Corner frequency fc (Rf·C)',Rf>0?fmt(fc):'none','Hz'],['Gain at fa',fmt(Ha)+' ('+fmt(20*Math.log10(Ha))+' dB)'],['Phase of output at fa',fmt(ph),'° (90° = leads input by 90°)'],['Output peak (simulation)',fmt(pk),'V']])+(pk>=Vs*.98?'<p class="bad">✖ Output is hitting its limit. Increase R·C or Rf’s effect (smaller Rf), or lower the input.</p>':'');
+plot(0,[{x:fs,y:ys,c:'#2563eb'}],{t:'Frequency response of the integrator',xl:'Frequency (Hz)',yl:'Gain (dB)',log:1,x0:.1,x1:1e5,y0:Math.min(...ys,-10)-5,y1:Math.max(...ys)+5,vl:[{x:fa,t:'fa',c:'#e53935'},{x:f0,t:'f0 (0 dB)',c:'#2e9d4f'}],hl:[{y:0,t:'0 dB',c:'#888'}]});
+const m=Math.max(Vp,pk)*1.2;plot(1,[{x:tt,y:vi,c:'#e0a800'},{x:tt,y:vv,c:'#00a3c4'}],{t:'Input (yellow) and output (blue) – last 3 cycles',xl:'Time (ms)',yl:'Volts',x0:0,x1:tt[tt.length-1],y0:-m,y1:m})}},
+8:{t:'8. Schmitt trigger using an op-amp',aim:'An inverting Schmitt trigger: the input goes to the − pin; R1 (from output to the + pin) and R2 (from the + pin to ground) set two switching levels, UTP and LTP. Plot the transfer characteristic.',
+f:[['R1','R1',10,'kΩ'],['R2','R2',10,'kΩ'],['Vs','Output saturation ±',12,'V'],['Vp','Input sine amplitude',8,'V'],['f','Input frequency',100,'Hz'],['UTP','Design helper: wanted UTP',4,'V']],cv:[360,330],
+st:['β = R2 / (R1 + R2).','Upper trip point UTP = +β·Vsat. Lower trip point LTP = −β·Vsat.','Hysteresis = UTP − LTP = 2β·Vsat.','Design: pick R2 (say 10 kΩ), then R1 = R2·(Vsat/UTP − 1).','Plot: the output is +Vsat until Vin rises above UTP, then it jumps to −Vsat. It comes back only when Vin falls below LTP.'],
+run(){const R1=gv('R1'),R2=gv('R2'),Vs=gv('Vs'),Vp=gv('Vp'),f=gv('f'),U0=gv('UTP'),be=R2/(R1+R2),U=be*Vs,Lw=-U,vm=Math.max(Vp*1.2,U*1.5);
+$('ares').innerHTML=tb([['β = R2/(R1+R2)',fmt(be)],['Upper trip point UTP',fmt(U),'V'],['Lower trip point LTP',fmt(Lw),'V'],['Hysteresis width',fmt(2*U),'V'],['Design helper: R1 for UTP = '+U0+' V (with this R2)',U0>0&&U0<Vs?fmt(R2*(Vs/U0-1)):'UTP must be between 0 and Vsat','kΩ']])+(Vp<U?'<p class="bad">✖ Input amplitude is smaller than UTP, so the output never switches.</p>':'');
+plot(0,[{x:[-vm,U,U,vm,Lw,Lw,-vm],y:[Vs,Vs,-Vs,-Vs,-Vs,Vs,Vs],c:'#2563eb'}],{t:'Transfer characteristic (Vout vs Vin) – hysteresis loop',xl:'Vin (V)',yl:'Vout (V)',x0:-vm,x1:vm,y0:-Vs*1.3,y1:Vs*1.3,vl:[{x:U,t:'UTP',c:'#e53935'},{x:Lw,t:'LTP',c:'#1e88e5'}]});
+const T=1/f,r=schm(t=>Vp*Math.sin(PI2*f*t),0,2*T,600,R1,R2,Vs),ms=r.t.map(v=>v*1e3);plot(1,[{x:ms,y:r.vi,c:'#e0a800'},{x:ms,y:r.vo,c:'#00a3c4'}],{t:'Input sine (yellow) and square output (blue)',xl:'Time (ms)',yl:'Volts',x0:0,x1:2*T*1e3,y0:-Vs*1.3,y1:Vs*1.3,hl:[{y:U,t:'UTP',c:'#e53935'},{y:Lw,t:'LTP',c:'#1e88e5'}]})}},
+9:{t:'9. Schmitt trigger – Virtual Lab (function generator + scope)',aim:'A live virtual bench. The function generator drives the Schmitt trigger and the scope shows Vin (yellow) and Vout (blue). Change the knobs and watch the output switch. Switch to XY mode to see the hysteresis loop.',
+f:[['f','Generator frequency',50,'Hz'],['Am','Amplitude',8,'V'],['Off','DC offset',0,'V'],['R1','R1',10,'kΩ'],['R2','R2',10,'kΩ'],['Vs','Output saturation ±',12,'V']],
+extra:WAVE.replace('sine</option><option>square','sine</option><option>triangle</option><option>square')+'<label>Scope mode<span><select id="a_view"><option value="time">Time (Y-T)</option><option value="xy">XY (transfer curve)</option></select></span></label><button id="a_run">⏸ Pause</button>',cv:[420],
+st:['Choose a wave: sine, triangle or square. Set the amplitude bigger than the UTP so the output switches.','Output goes to −Vsat when Vin passes UTP, and back to +Vsat when Vin falls below LTP.','Change R1 and R2: the dashed red/blue lines (UTP, LTP) move.','Try a DC offset: the switching points stay the same but the duty cycle changes.','Press Pause to freeze the picture. Use XY mode to see the loop, then write down UTP and LTP.'],
+after(){paused=false;$('a_run').onclick=()=>{paused=!paused;$('a_run').textContent=paused?'▶ Run':'⏸ Pause'}},run(){if(!ani)ani=requestAnimationFrame(frame);drawLive()}}};
+let cura=0,ani=0,paused=false;
+function drawLive(){if(cura!==9||!$('a_f'))return;const f=gv('f'),A=gv('Am'),O=gv('Off'),w=gs('wave'),Vs=gv('Vs'),T=1/f,t0=paused?0:performance.now()/1000*.2*T;
+const vf=t=>{const s=Math.sin(PI2*f*t);return O+A*(w==='sine'?s:w==='square'?(s>=0?1:-1):2/Math.PI*Math.asin(s))},r=schm(vf,t0,t0+3*T,500,gv('R1'),gv('R2'),Vs),vm=Math.max(Vs*1.2,Math.abs(O)+A*1.1),lines=[{x:r.U,t:'UTP',c:'#e53935'},{x:r.L,t:'LTP',c:'#1e88e5'}];
+if(gs('view')==='xy')plot(0,[{x:r.vi,y:r.vo,c:'#e0a800'}],{t:'XY mode: Vout vs Vin',xl:'Vin (V)',yl:'Vout (V)',x0:-vm,x1:vm,y0:-Vs*1.3,y1:Vs*1.3,vl:lines});
+else{const ms=r.t.map(v=>(v-t0)*1e3);plot(0,[{x:ms,y:r.vi,c:'#e0a800'},{x:ms,y:r.vo,c:'#00a3c4'}],{t:'CH1 yellow = Vin   ·   CH2 blue = Vout',xl:'Time (ms)',yl:'Volts',x0:0,x1:3*T*1e3,y0:-vm,y1:vm,hl:[{y:r.U,t:'UTP',c:'#e53935'},{y:r.L,t:'LTP',c:'#1e88e5'}]})}$('ares').innerHTML=tb([['UTP',fmt(r.U),'V'],['LTP',fmt(r.L),'V'],['Hysteresis',fmt(2*r.U),'V']])+(A+O<r.U&&O-A>r.L?'<p class="bad">✖ The signal never crosses UTP or LTP, so the output does not switch.</p>':'')}
+function frame(){if(cura!==9||$('ana').hidden){ani=0;return}if(!paused)drawLive();ani=requestAnimationFrame(frame)}
+function pane(k){cura=k;const p=AP[k];$('asel').value=k;$('apane').innerHTML=`<div class="pr"><b>${p.t}</b><br>${p.aim}</div><div class="grid">${p.f.map(([id,l,v,u])=>`<label>${l}<span><input type="number" id="a_${id}" value="${v}" step="any"> ${u}</span></label>`).join('')}${p.extra||''}</div><div id="ares" class="res"></div>${p.cv.map((h,i)=>`<canvas id="cv${i}" width="900" height="${h}"></canvas>`).join('')}<div class="pr"><b>Steps</b><ol>${p.st.map(s=>`<li>${s}</li>`).join('')}</ol></div>`;if(p.after)p.after();p.run()}
+$('asel').innerHTML=[5,6,7,8,9].map(k=>`<option value="${k}">${AP[k].t}</option>`).join('');$('asel').onchange=()=>pane(+$('asel').value);
+$('apane').addEventListener('input',()=>{if(cura)AP[cura].run()});
+$('tabD').onclick=()=>{$('dig').hidden=false;$('ana').hidden=true;$('tabD').className='p';$('tabA').className=''};
+$('tabA').onclick=()=>{$('dig').hidden=true;$('ana').hidden=false;$('tabA').className='p';$('tabD').className='';pane(cura||5)};
+
+render();
+</script></body></html>
